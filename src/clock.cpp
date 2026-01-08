@@ -7,16 +7,11 @@ NixieClock::NixieClock() {
 
 bool NixieClock::begin() {
     rtc_init();
-    datetime_t t = {
-      .year = 2026,
-      .month = 1,
-      .day = 1,
-      .dotw = 0,
-      .hour = 0,
-      .min = 0,
-      .sec = 0
-    };
-    return (rtc_set_datetime(&t));
+    return setTimeDate(); // Resets time to default value "2026-01-01 00:00:00"
+}
+
+bool NixieClock::setTimeDate(datetime_t new_time) {
+    return (rtc_set_datetime(&new_time));
 }
 
 bool NixieClock::update() {

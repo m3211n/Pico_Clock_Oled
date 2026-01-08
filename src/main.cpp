@@ -35,15 +35,11 @@ void loop() {
   // Serial.print("updateDisplay == "); Serial.println(updateDisplay);
   if (updateDisplay) {
     updateDisplay = false;
-    if (nixieClock.update()) {
-        if (showDate) {
-          muxDisplay.setBuf(nixieClock.dateBuf);
-        } else {
-          muxDisplay.setBuf(nixieClock.timeBuf);
-        }
+    nixieClock.update();
+    if (showDate) {
+      muxDisplay.setBuf(nixieClock.dateBuf);
     } else {
-      Serial.println("RTC is not running!");
-      delay(1000);
+      muxDisplay.setBuf(nixieClock.timeBuf);
     }
   }
 }
