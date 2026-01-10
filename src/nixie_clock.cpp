@@ -1,6 +1,6 @@
 #include "nixie_clock.h"
 
-NixieClock::Clock::Clock() : multiDisplay_() {}
+NixieClock::Clock::Clock() {}
 
 bool NixieClock::Clock::begin() {
     rtc_init();
@@ -10,38 +10,29 @@ bool NixieClock::Clock::begin() {
 
 bool NixieClock::Clock::setTimeDate(datetime_t new_time) {
     if (rtc_set_datetime(&new_time)) {
-        show(NixieClock::TimeOrDate::TIME);
+        show(true);
         return true;
     }
     return false;
 }
 
-void NixieClock::Clock::readBuffer_(NixieClock::TimeOrDate requestType) {
-    // Check if RTC is running; if not, return 000000
-    if (rtc_get_datetime(&now_)) {
-        if (requestType == TimeOrDate::TIME) {
-            // Time: HHMMSS
-            digitBuffer_[0] = (now_.hour / 10) + '0';
-            digitBuffer_[1] = (now_.hour % 10) + '0';
-            digitBuffer_[2] = (now_.min / 10) + '0';
-            digitBuffer_[3] = (now_.min % 10) + '0';
-            digitBuffer_[4] = (now_.sec / 10) + '0';
-            digitBuffer_[5] = (now_.sec % 10) + '0';
-        } else if (requestType == TimeOrDate::DATE) {
-            // Date: YYMMDD
-            digitBuffer_[0] = (now_.year % 100 / 10) + '0';
-            digitBuffer_[1] = (now_.year % 100 % 10) + '0';
-            digitBuffer_[2] = (now_.month / 10) + '0';
-            digitBuffer_[3] = (now_.month % 10) + '0';
-            digitBuffer_[4] = (now_.day / 10) + '0';
-            digitBuffer_[5] = (now_.day % 10) + '0';
-        }
-    }
+void NixieClock::Clock::updatePair_(uint8_t index, uint8_t value) {
+    digitBuffer_[index] = (value / 10) + '0';
+    digitBuffer_[index + 1] = (value % 10) + '0';
+};
+
+
+void NixieClock::Clock::updateBuffer_(bool showTime) {
+    updatePair_(0, showTime ? now_.hour : now_.year);
+    updatePair_(2, showTime ? now_.min : now_.month);
+    updatePair_(4, showTime ? now_.sec : now_.day);
 }
 
-void NixieClock::Clock::show(NixieClock::TimeOrDate timeOrDate) {
-    readBuffer_(timeOrDate);
-    multiDisplay_.printBuffer(digitBuffer_);
+void NixieClock::Clock::show(bool showTime) {
+    if (rtc_get_datetime(&now_)) {
+        updateBuffer_(showTime);
+        multiDisplay_.printBuffer(digitBuffer_);
+    }
 }
 
 NixieClock::MultiDisplay::MultiDisplay() : Adafruit_SSD1306(DISPLAY_WIDTH, DISPLAY_HEIGHT, &Wire, -1) {
@@ -88,7 +79,7 @@ bool NixieClock::MultiDisplay::selectChannel_(uint8_t channel) {
     } else return false;
 }
 
-void NixieClock::MultiDisplay::drawNumber(uint8_t position, uint8_t value) {
+void NixieClock::MultiDisplay::printNumber(uint8_t position, uint8_t value) {
     // Implementation to update display with digit
     const auto& lines = linesUnpacked_[value];
     selectChannel_(position);
@@ -106,7 +97,7 @@ void NixieClock::MultiDisplay::drawNumber(uint8_t position, uint8_t value) {
 void NixieClock::MultiDisplay::printBuffer(const NixieClock::digit_buffer& buf) {
   for (uint8_t i = 0; i < size_; i++) {
     uint8_t value = buf[i] - '0';
-    drawNumber(i, value);
+    printNumber(i, value);
   }
 }
 

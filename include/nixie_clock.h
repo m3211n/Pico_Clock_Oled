@@ -1,11 +1,8 @@
 #include <array>
-
 #include <Arduino.h>
 
 #include "Adafruit_SSD1306.h"
 #include "hardware/rtc.h"
-#include "pico/util/datetime.h"
-
 #include "nixie_digit.h"
 
 #ifndef NIXIE_CLOCK_H
@@ -36,18 +33,14 @@ namespace NixieClock {
         .sec = 0
     };
 
-    enum class TimeOrDate {
-        TIME,
-        DATE
-    };
-    // Manages multiplexor with displays connected to its channels
+    // Multiplexer with displays connected to its channels
     class MultiDisplay : public Adafruit_SSD1306 {
     public:
         MultiDisplay();
         // Initializes multiplexor and displays
         bool begin();
         // Selects a channel with connected display and draws a digit in it
-        void drawNumber(uint8_t position, uint8_t number);
+        void printNumber(uint8_t position, uint8_t number);
         // Draws the entire buffer to all displays consequentially
         void printBuffer(const NixieClock::digit_buffer& buf);
         // Utility function to scan the I2C bus through each of the channels
@@ -74,14 +67,15 @@ namespace NixieClock {
 
         bool begin();
         bool setTimeDate(datetime_t t);
-        void show(NixieClock::TimeOrDate timeOrDate);
+        // If flag set to 'true', then the time will be shown. 'false' - date.
+        void show(bool showTime);
 
     private:
         datetime_t now_;
         NixieClock::MultiDisplay multiDisplay_;
         NixieClock::digit_buffer digitBuffer_;
-
-        void readBuffer_(NixieClock::TimeOrDate dataType);
+        void updateBuffer_(bool showTime);
+        void updatePair_(uint8_t index, uint8_t value);
     };
 }
 

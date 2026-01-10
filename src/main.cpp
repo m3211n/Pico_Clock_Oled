@@ -1,11 +1,10 @@
 #include "nixie_clock.h"
 
 volatile bool updateClock = false;
-volatile bool showDate = false;
+volatile bool showTime = true;
 
+NixieClock::Clock nixieClock;
 struct repeating_timer timer;
-
-NixieClock::Clock        nixieClock;
 
 bool timer_callback(struct repeating_timer *t) {
   updateClock = true;
@@ -22,7 +21,7 @@ void setup() {
 void loop() {
   if (updateClock) {
     updateClock = false;
-    nixieClock.show(showDate ? NixieClock::TimeOrDate::DATE : NixieClock::TimeOrDate::TIME);
+    nixieClock.show(showTime);
   }
 }
 
