@@ -1,9 +1,9 @@
 #include <vector>
 #include <array>
-#include "stdint.h"
+#include <cstdint>
 
-#ifndef NIXIE_DISPLAY_H
-#define NIXIE_DISPLAY_H
+#ifndef NIXIE_DIGIT_H
+#define NIXIE_DIGIT_H
 
 namespace NixieDigit {
 
@@ -32,7 +32,7 @@ namespace NixieDigit {
 // The display is rotated 90 degrees counter-clockwise, so the grid is horizontal.
 
     // This is all digits' points that eventually will be "unpacked" to line coordinates (x, y)
-    inline const std::vector<std::vector<uint8_t>> POINTS = {
+    inline const std::array<std::vector<uint8_t>, 10> POINTS = {{
         {0, 8, 26, 18, 0},                  // 0
         {7, 17, 9},                         // 1
         {18, 0, 1, 23, 26, 8, 7},           // 2
@@ -43,10 +43,10 @@ namespace NixieDigit {
         {0, 26, 8, 7},                      // 7
         {0, 2, 24, 26, 8, 6, 20, 18, 0},    // 8
         {0, 9, 20, 26, 8, 3, 21}            // 9
-    };
+    }};
 
     // This is how many points each grid "line" has. 
-    #define GRID_WIDTH 9
+    constexpr uint8_t GRID_WIDTH = 9;
 
     // This is how many pixels are in between on each point both horizontally and 
     // vertically; this value is used to "unpack" point number to the (x, y)

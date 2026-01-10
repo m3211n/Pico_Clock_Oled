@@ -1,5 +1,4 @@
 #include <array>
-#include <vector>
 
 #include <Arduino.h>
 
@@ -17,13 +16,12 @@ constexpr uint8_t MUX_ADDR = 0x70;
 constexpr uint32_t I2C_SPEED = 100000; // Hz
 
 // This is how many displays are connected to the mux
-constexpr uint8_t NIXIE_CLUSTER_SIZE = 6;
+constexpr uint8_t CLUSTER_SIZE = 6; // Max: 8
 
 // Display (SSD1306 OLED) parameters
 constexpr uint8_t DISPLAY_ADDR = 0x3C; // < See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 constexpr int16_t DISPLAY_WIDTH = 128;
 constexpr int16_t DISPLAY_HEIGHT = 32;
-
 
 namespace NixieClock {
     using digit_buffer = std::array<char, 6>;
@@ -43,9 +41,9 @@ namespace NixieClock {
         DATE
     };
     // Manages multiplexor with displays connected to its channels
-    class MuxDisplay : public Adafruit_SSD1306 {
+    class MultiDisplay : public Adafruit_SSD1306 {
     public:
-        MuxDisplay();
+        MultiDisplay();
         // Initializes multiplexor and displays
         bool begin();
         // Selects a channel with connected display and draws a digit in it
@@ -58,14 +56,15 @@ namespace NixieClock {
         void verboseMode(bool flag);
 
     private:
-        uint8_t size;
-        uint8_t mux_addr;
-        uint8_t display_addr;
-        uint32_t speed;
-        uint8_t currentChannel;
-        bool _verbose;
-        NixieDigit::DigitSet linesUnpacked;
-        bool selectChannel(uint8_t channel);
+        uint8_t  size_;
+        uint8_t  mux_addr_;
+        uint8_t  display_addr_;
+        uint32_t bus_speed_;
+        uint8_t  currentChannel_;
+        bool     verbose_;
+        NixieDigit::DigitSet linesUnpacked_;
+
+        bool selectChannel_(uint8_t channel);
     };
 
     // Clock manager
@@ -78,10 +77,11 @@ namespace NixieClock {
         void show(NixieClock::TimeOrDate timeOrDate);
 
     private:
-        NixieClock::MuxDisplay display;
-        NixieClock::digit_buffer digitBuffer;
+        datetime_t now_;
+        NixieClock::MultiDisplay multiDisplay_;
+        NixieClock::digit_buffer digitBuffer_;
 
-        void readBuffer(NixieClock::TimeOrDate dataType, NixieClock::digit_buffer& digitBuffer);
+        void readBuffer_(NixieClock::TimeOrDate dataType);
     };
 }
 
