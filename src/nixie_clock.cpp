@@ -1,37 +1,68 @@
 #include "nixie_clock.h"
 
-
-NixieClock::Clock::Clock() {}
-
-bool NixieClock::Clock::begin() {
-    rtc_init();
-    multiDisplay_.begin();
-    return setTimeDate(NixieClock::DEFAULT_TIME);
+NixieClock::Clock::Clock() {
+    mode_ = true;
+    updateClock_ = false;
 }
 
-bool NixieClock::Clock::setTimeDate(datetime_t new_time) {
+bool NixieClock::Clock::begin() {
+    multiDisplay_.begin();
+    if (!rtc_running()) {
+        rtc_init();
+        return setDateTime(NixieClock::DEFAULT_TIME);
+    } 
+    return true;
+}
+
+bool NixieClock::Clock::setDateTime(datetime_t new_time) {
     if (rtc_set_datetime(&new_time)) {
-        show(true);
+        refresh();
         return true;
     }
     return false;
 }
 
-void NixieClock::Clock::updatePair_(NixieClock::DigitBuffer& buf, uint8_t index, uint8_t value) {
-    buf[index] = (value / 10) + '0';
-    buf[index + 1] = (value % 10) + '0';
-};
-
-void NixieClock::Clock::updateBuffer_(NixieClock::DigitBuffer& buf, bool showTime) {
-    updatePair_(buf, 0, showTime ? now_.hour : now_.year);
-    updatePair_(buf, 2, showTime ? now_.min : now_.month);
-    updatePair_(buf, 4, showTime ? now_.sec : now_.day);
+void NixieClock::Clock::switchMode(bool mode) {
+    #if VERBOSE_MODE > 0
+    Serial.printf("Switching mode to %s \n", mode_ ? "time" : "date");
+    #endif
+    mode_ = mode;
 }
 
-void NixieClock::Clock::show(bool showTime) {
+void NixieClock::Clock::focusAt(uint8_t index) {
+    unFocus();
+    multiDisplay_.focus(index * 2, true);
+    multiDisplay_.refresh(index * 2);
+    multiDisplay_.focus(index * 2 + 1, true);
+    multiDisplay_.refresh(index * 2 + 1);
+}
+
+void NixieClock::Clock::unFocus() {
+    for (uint8_t i = 0; i < CLUSTER_SIZE; i++) {
+        if (multiDisplay_.isFocused(i)) {
+            multiDisplay_.focus(i, false);
+            multiDisplay_.refresh(i);
+        }
+    }
+}
+
+void NixieClock::Clock::updateDisplayPair_(uint8_t index, uint8_t value) {
+    multiDisplay_.setDigit(index * 2, value / 10);
+    multiDisplay_.setDigit(index * 2 + 1, value % 10);
+};
+
+void NixieClock::Clock::updateDisplaysRegister_() {
+    updateDisplayPair_(0, mode_ ? now_.hour : now_.year % 100);
+    updateDisplayPair_(1, mode_ ? now_.min : now_.month);
+    updateDisplayPair_(2, mode_ ? now_.sec : now_.day);
+}
+
+void NixieClock::Clock::refresh() {
     if (rtc_get_datetime(&now_)) {
-        updateBuffer_(multiDisplay_.digitBuffer, showTime);
-        multiDisplay_.printBuffer();
+        #if VERBOSE_MODE > 0
+        Serial.printf("Current mode is %s \n", mode_ ? "time" : "date");
+        #endif
+        updateDisplaysRegister_();
     }
 }
 
@@ -41,12 +72,10 @@ NixieClock::MultiDisplay::MultiDisplay() : Adafruit_SSD1306(DISPLAY_WIDTH, DISPL
     display_addr_ = DISPLAY_ADDR;
     size_ =         CLUSTER_SIZE;
     bus_speed_ =    I2C_SPEED;
-    verbose_ =      false;
+    currentChannel_ = 8; // Initialize with value bigger than 7 (maximum channel address)
 }
 
-bool NixieClock::MultiDisplay::begin() { 
-    verbose_ = false;
-
+bool NixieClock::MultiDisplay::begin() {
     // Unpack digit points to draw lines
     NixieDigit::unpackLines(linesUnpacked_, DISPLAY_WIDTH);
 
@@ -57,7 +86,11 @@ bool NixieClock::MultiDisplay::begin() {
 
     // Initialize SSD1306 OLEDs
     for (uint8_t chan = 0; chan < size_; chan++) {
-        if (selectChannel_(chan) && Adafruit_SSD1306::begin(SSD1306_SWITCHCAPVCC, display_addr_)) {
+        if (selectChannel_(chan) && Adafruit_SSD1306::begin(i2caddr=DISPLAY_ADDR)) {
+            displayRegister_[chan].digit = 0;
+            refresh(chan);
+            dim(true);
+            focus(chan, false);
             continue;
         } else {
             return false;
@@ -73,38 +106,62 @@ bool NixieClock::MultiDisplay::selectChannel_(uint8_t channel) {
     // If transmission sucessful, record current channel
     if (Wire.endTransmission() == 0) {
         currentChannel_ = channel;
-        if (verbose_) { 
+
+        #if VERBOSE_MODE > 0
             Serial.printf("Mux >> %02d.\n", currentChannel_);
-        };
+        #endif
+
         return true;
     } else return false;
 }
 
-void NixieClock::MultiDisplay::printNumber(uint8_t position, uint8_t value) {
+bool NixieClock::MultiDisplay::setDigit(uint8_t position, uint8_t value) {
+    if (displayRegister_[position].digit != value) {
+
+        #if VERBOSE_MODE > 0
+            Serial.printf("Assigning %d to position %02d (current value: %d) \n", value, position, displayRegister_[position].digit);
+        #endif
+
+        displayRegister_[position].digit = value;
+        refresh(position);
+        return true;
+    } else return false;
+}
+
+void NixieClock::MultiDisplay::refresh(uint8_t position) {
     // Implementation to update display with digit
-    const auto& lines = linesUnpacked_[value];
+    const auto& lines = linesUnpacked_[displayRegister_[position].digit];
     selectChannel_(position);
     clearDisplay();
-    if (verbose_) { Serial.println(value); }
-    for (auto& line : lines) {
-        drawLine(line.x0, line.y0, line.x1, line.y1, SSD1306_WHITE);
-        if (verbose_) {
-            Serial.printf("x0 = %d, y0 = %d, x1 = %d, y1 = %d", line.x0, line.y0, line.x1, line.y1);
-        }
+
+    #if VERBOSE_MODE > 0
+        Serial.printf("Printing %d at position %02d \n", displayRegister_[position].digit, position);
+    #endif
+    
+    for (auto& line : lines) { 
+        drawLine(line.x0 + 6, line.y0, line.x1 + 6, line.y1, SSD1306_WHITE);
     }
+    
+    // invertDisplay(displayRegister_[position].focused);
+    fillRect(0, 0, 3, 31, displayRegister_[position].focused ? SSD1306_WHITE : SSD1306_BLACK);
+
+    dim(!displayRegister_[position].focused);
+    // setRotation(1);
+    // drawChar(0, 0, displayRegister_[position].value + '0', 1, 0, 6);
     display();
 }
 
-void NixieClock::MultiDisplay::printBuffer() {
-  for (uint8_t i = 0; i < size_; i++) {
-    uint8_t value = digitBuffer[i] - '0';
-    printNumber(i, value);
-  }
+void NixieClock::MultiDisplay::focus(uint8_t position, bool focused) {
+    displayRegister_[position].focused = focused;
+    // paint horizontal lines with black to dim even more;
+}
+
+bool NixieClock::MultiDisplay::isFocused(uint8_t position) {
+    return displayRegister_[position].focused;
 }
 
 bool NixieClock::MultiDisplay::scan() {
     // In verbose mode, adds a delay 5 sec. to give time for cable re-connection, running terminal etc.
-    if (verbose_) { delay(5000); }
     for (uint8_t chan = 0; chan < size_; chan++) {
         if (!selectChannel_(chan)) {
             Serial.println("[ERROR] Could not connect to Multiplexer!");
@@ -117,13 +174,19 @@ bool NixieClock::MultiDisplay::scan() {
             Wire.beginTransmission(addr);
             if (Wire.endTransmission() == 0) {
                 connectedDevices++;
-                if (verbose_) { Serial.printf("Found I2C device (%#x) at channel %02d\n", addr, chan); }
+
+                #if VERBOSE_MODE > 0
+                Serial.printf("Found I2C device (%#x) at channel %02d\n", addr, chan);
+                #endif
+
             }
         }
-        if (verbose_ && connectedDevices == 0) { Serial.printf("No I2C devices found at channel %02d\n", chan); }
+
+        #if VERBOSE_MODE > 0
+        if (connectedDevices == 0) { Serial.printf("No I2C devices found at channel %02d\n", chan); }
+        #endif
+
     }
     selectChannel_(0);
     return true;
 }
-
-void NixieClock::MultiDisplay::verboseMode(bool flag) { verbose_ = flag; }

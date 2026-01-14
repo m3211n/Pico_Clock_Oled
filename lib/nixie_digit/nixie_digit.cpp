@@ -1,7 +1,7 @@
 #include "nixie_digit.h"
 
 void NixieDigit::unpackLines(NixieDigit::DigitSet& digits, uint16_t canvasWidth) {
-    uint16_t gridGap = (canvasWidth / (GRID_WIDTH - 1) - 1);
+    uint16_t gridGap = canvasWidth / (GRID_WIDTH-1) - 1;
     uint8_t index = 0;
     for (auto& digit_points : NixieDigit::POINTS) {
         NixieDigit::Digit lines = {};
