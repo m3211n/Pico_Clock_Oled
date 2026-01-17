@@ -5,11 +5,11 @@ NixieClock::Clock::Clock() {
     updateClock_ = false;
 }
 
-bool NixieClock::Clock::begin() {
+bool NixieClock::Clock::begin(datetime_t initTime) {
     multiDisplay_.begin();
     if (!rtc_running()) {
         rtc_init();
-        return setDateTime(NixieClock::DEFAULT_TIME);
+        return setDateTime(initTime);
     } 
     return true;
 }

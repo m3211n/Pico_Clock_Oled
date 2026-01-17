@@ -79,7 +79,7 @@ namespace NixieClock {
     public:  
         Clock();
 
-        bool begin();
+        bool begin(datetime_t initTime);
         // Sends new date and time to RTC and updates the displays
         bool setDateTime(datetime_t t);
         // If flag set to 'true', then the time will be shown. 'false' - date.
