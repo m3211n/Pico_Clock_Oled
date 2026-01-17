@@ -11,8 +11,8 @@ constexpr datetime_t DEFAULT_TIME = {
     .month = 1,
     .day = 17,
     .dotw = 5,
-    .hour = 15,
-    .min = 38,
+    .hour = 18,
+    .min = 13,
     .sec = 0
 };
 
