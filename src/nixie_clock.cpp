@@ -8,44 +8,26 @@ namespace NixieClock {
     }
 
     bool Clock::begin(datetime_t initTime) {
+
+        Serial.println("*** Nixie Clock begin...");
+
         multiDisplay_.begin();
         if (!rtc_running()) {
             rtc_init();
-            return setDateTime(initTime);
-        } 
-        return true;
-    }
-
-    bool Clock::setDateTime(datetime_t new_time) {
-        if (rtc_set_datetime(&new_time)) {
-            refresh();
+            rtc_set_datetime(&initTime);
+        }
+        if (rtc_get_datetime(&now_)) {
+            Serial.println("*** Nixie Clock: OK!");
             return true;
         }
         return false;
     }
 
     void Clock::switchMode(bool mode) {
-        #if VERBOSE_MODE > 0
-        Serial.printf("Switching mode to %s \n", mode_ ? "time" : "date");
-        #endif
+
+        Serial.printf("[ACTION] Switching mode to %s \n", mode_ ? "time" : "date");
+
         mode_ = mode;
-    }
-
-    void Clock::focusAt(uint8_t index) {
-        unFocus();
-        multiDisplay_.focus(index * 2, true);
-        multiDisplay_.refresh(index * 2);
-        multiDisplay_.focus(index * 2 + 1, true);
-        multiDisplay_.refresh(index * 2 + 1);
-    }
-
-    void Clock::unFocus() {
-        for (uint8_t i = 0; i < CLUSTER_SIZE; i++) {
-            if (multiDisplay_.isFocused(i)) {
-                multiDisplay_.focus(i, false);
-                multiDisplay_.refresh(i);
-            }
-        }
     }
 
     void Clock::updateDisplayPair_(uint8_t index, uint8_t value) {
@@ -54,16 +36,22 @@ namespace NixieClock {
     };
 
     void Clock::updateDisplaysRegister_() {
+
+        Serial.println("[INFO] Updating display registers...");
+
         updateDisplayPair_(0, mode_ ? now_.hour : now_.year % 100);
         updateDisplayPair_(1, mode_ ? now_.min : now_.month);
         updateDisplayPair_(2, mode_ ? now_.sec : now_.day);
+
+        Serial.println("[INFO] Display registers updated...");
+
     }
 
     void Clock::refresh() {
         if (rtc_get_datetime(&now_)) {
-            #if VERBOSE_MODE > 0
-            Serial.printf("Current mode is %s \n", mode_ ? "time" : "date");
-            #endif
+
+            Serial.printf("[INFO] Clock refresh. Current mode is %s \n", mode_ ? "time" : "date");
+
             updateDisplaysRegister_();
         }
     }
@@ -79,26 +67,27 @@ namespace NixieClock {
     }
 
     bool MultiDisplay::begin() {
+
+        Serial.println("*** Multi-display begin...");
+
         // Unpack digit points to draw lines
         NixieDigit::unpackLines(linesUnpacked_, DISPLAY_WIDTH);
 
         // Prepare I2C bus
         Wire.begin();
+        Adafruit_SSD1306::begin(i2caddr=DISPLAY_ADDR);
         Wire.setClock(bus_speed_);
         Wire.beginTransmission(mux_addr_);
 
         // Initialize SSD1306 OLEDs
         for (uint8_t chan = 0; chan < size_; chan++) {
-            if (selectChannel_(chan) && Adafruit_SSD1306::begin(i2caddr=DISPLAY_ADDR)) {
-                displayRegister_[chan].digit = 0;
-                refresh(chan);
-                dim(true);
-                focus(chan, false);
-                continue;
-            } else {
-                return false;
-            }
+            setDigit(chan, 0);
+            dim(true);
+            focus(chan, false);
         }
+
+        Serial.println("*** Multi display: OK!");
+
         return true;
     }
 
@@ -120,12 +109,10 @@ namespace NixieClock {
 
     bool MultiDisplay::setDigit(uint8_t position, uint8_t value) {
         if (displayRegister_[position].digit != value) {
+
+            Serial.printf("Assigning %d to position %02d (current value: %d) \n", value, position, displayRegister_[position].digit);
+
             displayRegister_[position].digit = value;
-
-            #if VERBOSE_MODE > 0
-                Serial.printf("Assigning %d to position %02d (current value: %d) \n", value, position, displayRegister_[position].digit);
-            #endif
-
             refresh(position);
             return true;
         } else return false;
@@ -137,9 +124,7 @@ namespace NixieClock {
         selectChannel_(position);
         clearDisplay();
 
-        #if VERBOSE_MODE > 0
-            Serial.printf("Printing %d at position %02d \n", displayRegister_[position].digit, position);
-        #endif
+        Serial.printf("Printing %d at position %02d \n", displayRegister_[position].digit, position);
         
         for (auto& line : lines) { 
             drawLine(line.x0 + 6, line.y0, line.x1 + 6, line.y1, SSD1306_WHITE);

@@ -81,17 +81,9 @@ namespace NixieClock {
 
         bool begin(datetime_t initTime);
         // Sends new date and time to RTC and updates the displays
-        bool setDateTime(datetime_t t);
-        // If flag set to 'true', then the time will be shown. 'false' - date.
         void refresh();
-        // Focus next display
-        void focusNext();
         // Switches clock mode between time and date
         void switchMode(bool showTime);
-        // Focuses pair of displays
-        void focusAt(uint8_t index);
-        // Unfocus any focused pair
-        void unFocus();
 
     private:
         datetime_t now_;
