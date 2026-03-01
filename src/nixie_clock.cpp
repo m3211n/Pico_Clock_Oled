@@ -75,20 +75,19 @@ namespace NixieClock {
 
         // Prepare I2C bus
         Wire.begin();
-        Adafruit_SSD1306::begin(i2caddr=DISPLAY_ADDR);
         Wire.setClock(bus_speed_);
         Wire.beginTransmission(mux_addr_);
 
         // Initialize SSD1306 OLEDs
         for (uint8_t chan = 0; chan < size_; chan++) {
+            selectChannel_(chan);
+            Adafruit_SSD1306::begin(i2caddr=DISPLAY_ADDR);
             setDigit(chan, 0);
-            dim(true);
-            focus(chan, false);
         }
 
         Serial.println("*** Multi display: OK!");
 
-        return true;
+        return scan();
     }
 
     bool MultiDisplay::selectChannel_(uint8_t channel) {
